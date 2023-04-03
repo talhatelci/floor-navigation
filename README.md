@@ -1,6 +1,11 @@
 # Three.js FloorNavigation
 
-This class allows users to navigate on a mesh in three.js with the help of three.js' OrbitControls and GSAP animation library.
+This class allows users to navigate on a mesh in Three.js with the help of Three.js' OrbitControls and GSAP animation library.
+
+## Dependencies
+
+• Three.js\
+• GSAP
 
 ## Usage
 
@@ -54,23 +59,23 @@ controls.getOrbitControls().dampingFactor = 0.1;
 Clone the project
 
 ```bash
-  git clone https://github.com/talhatelci/floor-navigation
+git clone https://github.com/talhatelci/floor-navigation
 ```
 
 Go to the project directory
 
 ```bash
-  cd floor-navigation
+cd floor-navigation
 ```
 
 Install dependencies
 
 ```bash
-  npm install
+npm install
 ```
 
 Start the server
 
 ```bash
-  npm run dev
+npm run dev
 ```
