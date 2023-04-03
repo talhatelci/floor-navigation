@@ -54,7 +54,7 @@ controls.getOrbitControls().dampingFactor = 0.1;
 Clone the project
 
 ```bash
-  git clone https://link-to-project
+  git clone https://github.com/talhatelci/floor-navigation
 ```
 
 Go to the project directory
