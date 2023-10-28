@@ -1,8 +1,16 @@
 import "./style.css";
-import Demo from "./Demo.js";
+import { setThree } from "./demo/setThree.js";
+import { loadAssets } from "./demo/loadAssets.js";
+import { setInitialState } from "./demo/setInitialState.js";
+import { setObjects } from "./demo/setObjects.js";
+import { setFloorNavigation } from "./demo/setFloorNavigation.js";
 
-let demo;
+window._three = setThree();
+window._three.user = {};
 
-window.addEventListener("load", () => {
-  demo = new Demo(document.querySelector(".canvas-container"));
+loadAssets((assets) => {
+  _three.assets = assets;
+  setInitialState();
+  setObjects();
+  setFloorNavigation();
 });

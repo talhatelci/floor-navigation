@@ -32,7 +32,7 @@ class FloorNavigation {
     }
 
     if (indicator != null && !Object.keys(indicator).includes("isObject3D")) {
-      console.error("Error: 'indicator' parameter should be an Object3D.");
+      console.error("Error: 'indicator' should be an Object3D.");
       return;
     }
 
@@ -42,39 +42,17 @@ class FloorNavigation {
     this.obstacles = obstacles;
     this.indicator = indicator;
 
-    this.#initialize();
+    this._start();
   }
 
-  /*
-    Private Fields
-  */
-
-  #sizes;
-  #isTouchDevice;
-  #orbitControls;
-  #raycaster;
-  #rayCheck;
-  #pointer;
-  #indicatorEnabled;
-  #tlShowIndicator;
-  #tlMoveIndicator;
-  #dragCheck;
-
-  /*
-    Private methods
-  */
-
-  #initialize() {
-    // Dom element's sizes
-    this.#sizes = {
+  _start() {
+    this._sizes = {
       width: this.domElement.offsetWidth,
       height: this.domElement.offsetHeight,
     };
 
-    // Checking if it is a touch device to determine if the indicator will be shown
-    this.#isTouchDevice = Boolean("ontouchstart" in window || navigator.msMaxTouchPoints);
+    this._isTouchDevice = Boolean("ontouchstart" in window || navigator.msMaxTouchPoints);
 
-    // Three.js' OrbitControl to rotate camera
     let initialDirection = new Vector3(0, 0, -1);
     initialDirection.applyQuaternion(this.camera.quaternion);
     initialDirection.normalize().multiplyScalar(0.00001);
@@ -82,89 +60,96 @@ class FloorNavigation {
     let initialTarget = this.camera.position.clone();
     initialTarget.add(initialDirection);
 
-    this.#orbitControls = new OrbitControls(this.camera, this.domElement);
-    this.#orbitControls.target = initialTarget;
-    this.#orbitControls.minPolarAngle = Math.PI * 0.05;
-    this.#orbitControls.maxPolarAngle = Math.PI * 0.95;
-    this.#orbitControls.rotateSpeed = -0.25;
-    this.#orbitControls.dampingFactor = 0.1;
-    this.#orbitControls.enableZoom = false;
-    this.#orbitControls.enablePan = false;
-    this.#orbitControls.enableDamping = true;
+    this._orbitControls = new OrbitControls(this.camera, this.domElement);
+    this._orbitControls.target = initialTarget;
+    this._orbitControls.minPolarAngle = Math.PI * 0.05;
+    this._orbitControls.maxPolarAngle = Math.PI * 0.95;
+    this._orbitControls.rotateSpeed = -0.25;
+    this._orbitControls.dampingFactor = 0.1;
+    this._orbitControls.enableZoom = false;
+    this._orbitControls.enablePan = false;
+    this._orbitControls.enableDamping = true;
 
-    // Raycaster to determine clicked point's position or update the indicator position
-    this.#raycaster = new Raycaster();
-
-    // An array to check if a floor or an obstacle clicked or hovered
-    this.#rayCheck = [this.floorMesh, ...this.obstacles];
+    this._raycaster = new Raycaster();
+    this._rayCheck = [this.floorMesh, ...this.obstacles];
     this.floorMesh.userData.name = "floorMesh";
     this.obstacles.forEach((obstacle) => {
       obstacle.userData.name = "obstacle";
     });
 
-    // Normalized pointer coordinates
-    this.#pointer = new Vector2();
+    this._moving = false;
 
-    // Setting indicator and timelines
-    this.#indicatorEnabled = Boolean(this.indicator != null && this.indicator.isObject3D);
+    this._pointer = new Vector2(-1000, -1000);
 
-    if (this.#indicatorEnabled) {
+    this._indicatorEnabled = Boolean(this.indicator != null && this.indicator.isObject3D);
+
+    if (this._indicatorEnabled) {
       this.indicator.position.set(0, this.floorMesh.position.y + 0.01, 0);
       this.indicator.material.transparent = true;
       this.indicator.material.opacity = 0;
-      this.indicator.material.visible = !this.#isTouchDevice;
+      this.indicator.material.visible = !this._isTouchDevice;
 
-      // Timeline to animate the indicator's opacity smoothly
-      this.#tlShowIndicator = gsap.timeline().pause().reverse();
-
-      this.#tlShowIndicator.to(this.indicator.material, {
+      this._indicatorVisible = false;
+      this._tlShowIndicator = gsap.timeline().pause().reverse();
+      this._tlShowIndicator.to(this.indicator.material, {
         opacity: 1,
-        duration: 0.2,
+        duration: 0.4,
+        ease: "none",
       });
 
-      // Timeline to animate the movement of the indicator
-      this.#tlMoveIndicator = gsap.timeline();
+      this._tlMoveIndicator = gsap.timeline();
+
+      this._tlClickIndicator = gsap.timeline().pause();
+      this._tlClickIndicator.to(this.indicator.scale, {
+        x: 1.5,
+        y: 1.5,
+        duration: 0.2,
+      });
+      this._tlClickIndicator.to(this.indicator.scale, {
+        x: 1,
+        y: 1,
+        duration: 0.6,
+      });
     }
 
-    // A field to differentiate click and drag event
-    this.#dragCheck = false;
+    this._dragCheck = false;
 
-    this.#addEventListeners();
+    this._addEventListeners();
   }
 
-  #addEventListeners() {
-    this.domElement.addEventListener("touchstart", (event) => this.#onPointerDown(event));
-    this.domElement.addEventListener("touchmove", (event) => this.#onPointerMove(event));
-    this.domElement.addEventListener("touchend", (event) => this.#onPointerUp(event));
+  _addEventListeners() {
+    this.domElement.addEventListener("touchstart", (event) => this._onPointerDown(event));
+    this.domElement.addEventListener("touchmove", (event) => this._onPointerMove(event));
+    this.domElement.addEventListener("touchend", (event) => this._onPointerUp(event));
 
-    this.domElement.addEventListener("mousedown", (event) => this.#onPointerDown(event));
-    this.domElement.addEventListener("mousemove", (event) => this.#onPointerMove(event));
-    this.domElement.addEventListener("mouseup", (event) => this.#onPointerUp(event));
+    this.domElement.addEventListener("mousedown", (event) => this._onPointerDown(event));
+    this.domElement.addEventListener("mousemove", (event) => this._onPointerMove(event));
+    this.domElement.addEventListener("mouseup", (event) => this._onPointerUp(event));
 
-    window.addEventListener("resize", () => this.#onResize());
+    window.addEventListener("resize", () => this._onResize());
   }
 
-  #onPointerDown(event) {
+  _onPointerDown(event) {
     event.preventDefault();
 
-    this.#dragCheck = false;
+    this._dragCheck = false;
   }
 
-  #onPointerMove(event) {
+  _onPointerMove(event) {
     event.preventDefault();
 
-    let { x, y } = this.#getNormalizedEventCoordinates(event);
-    this.#pointer.set(x, y);
+    let { x, y } = this._getNormalizedEventCoordinates(event);
+    this._pointer.set(x, y);
 
-    this.#dragCheck = true;
+    this._dragCheck = true;
   }
 
-  #onPointerUp(event) {
-    if (!this.#dragCheck) {
-      let { x, y } = this.#getNormalizedEventCoordinates(event);
-      this.#pointer.set(x, y);
+  _onPointerUp(event) {
+    if (!this._dragCheck) {
+      let { x, y } = this._getNormalizedEventCoordinates(event);
+      this._pointer.set(x, y);
 
-      let intersects = this.#castRay();
+      let intersects = this._castRay();
 
       if (!intersects[0]) {
         return;
@@ -181,30 +166,36 @@ class FloorNavigation {
         gsap.to(this.camera.position, {
           x: clickedPosition.x,
           z: clickedPosition.z,
+          duration: 0.8,
+          ease: "power4.in",
           onStart: () => {
-            this.#orbitControls.enabled = false;
+            this._moving = true;
+
+            this._tlClickIndicator.restart();
+            this._orbitControls.enabled = false;
           },
           onUpdate: () => {
             let target = this.camera.position.clone().add(cameraDirection);
-            this.#orbitControls.target = target;
+            this._orbitControls.target = target;
           },
           onComplete: () => {
-            this.#orbitControls.enabled = true;
+            this._moving = false;
+            this._orbitControls.enabled = true;
           },
         });
       }
     }
   }
 
-  #onResize() {
-    this.#sizes.width = this.domElement.offsetWidth;
-    this.#sizes.height = this.domElement.offsetHeight;
+  _onResize() {
+    this._sizes.width = this.domElement.offsetWidth;
+    this._sizes.height = this.domElement.offsetHeight;
 
-    this.#isTouchDevice = Boolean("ontouchstart" in window || navigator.msMaxTouchPoints);
-    this.indicator.material.visible = !this.#isTouchDevice;
+    this._isTouchDevice = Boolean("ontouchstart" in window || navigator.msMaxTouchPoints);
+    this.indicator.material.visible = !this._isTouchDevice;
   }
 
-  #getNormalizedEventCoordinates(event) {
+  _getNormalizedEventCoordinates(event) {
     let isTouch = event.type.startsWith("touch");
     let touch = null;
     if (isTouch) {
@@ -215,48 +206,54 @@ class FloorNavigation {
     let eventY = isTouch ? touch.clientY : event.clientY;
 
     return {
-      x: (eventX / this.#sizes.width) * 2 - 1,
-      y: -(eventY / this.#sizes.height) * 2 + 1,
+      x: (eventX / this._sizes.width) * 2 - 1,
+      y: -(eventY / this._sizes.height) * 2 + 1,
     };
   }
 
-  #castRay() {
-    this.#raycaster.setFromCamera(this.#pointer, this.camera);
-    let intersects = this.#raycaster.intersectObjects(this.#rayCheck);
+  _castRay() {
+    this._raycaster.setFromCamera(this._pointer, this.camera);
+    let intersects = this._raycaster.intersectObjects(this._rayCheck);
     return intersects;
   }
 
-  #updateIndicator() {
-    let intersects = this.#castRay();
+  _updateIndicator() {
+    if (this._moving) {
+      return;
+    }
+
+    let intersects = this._castRay();
 
     if (intersects[0] && intersects[0].object.userData.name == "floorMesh") {
-      this.#tlShowIndicator.play();
+      if (!this._indicatorVisible) {
+        this._indicatorVisible = true;
+        this._tlShowIndicator.play();
+      }
 
-      this.#tlMoveIndicator.clear();
-      this.#tlMoveIndicator.to(this.indicator.position, {
+      this._tlMoveIndicator.clear();
+      this._tlMoveIndicator.to(this.indicator.position, {
         x: intersects[0].point.x,
         z: intersects[0].point.z,
         duration: 0.1,
       });
     } else {
-      this.#tlShowIndicator.reverse();
+      if (this._indicatorVisible) {
+        this._indicatorVisible = false;
+        this._tlShowIndicator.reverse();
+      }
     }
   }
 
-  /*
-    Public methods
-  */
-
   getOrbitControls() {
-    return this.#orbitControls;
+    return this._orbitControls;
   }
 
   update() {
-    if (!this.#isTouchDevice && this.#indicatorEnabled) {
-      this.#updateIndicator();
+    if (!this._isTouchDevice && this._indicatorEnabled) {
+      this._updateIndicator();
     }
 
-    this.#orbitControls.update();
+    this._orbitControls.update();
   }
 }
 
